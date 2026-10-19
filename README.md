@@ -1,18 +1,27 @@
 # Bedtime Runway
 
-**{{TAGLINE}}**
+**Move your sleep, gently, to where it needs to be.**
 
-{{Один абзац о том, что делает приложение и для кого.}}
+Плавный переход на новый режим сна — к ранней смене, рейсу или экзамену.
+Приложение учит твои внутренние часы по записям ночей (свободные ночи весят
+больше, ночи с будильником поправляются на недосып), строит точный план отбоя
+на каждую ночь с ограничением на сдвиг за ночь и показывает ожидаемую бодрость
+на важных событиях. Полностью офлайн.
 
 ## Особенности
 
-- ...
+- Накапливаемая оценка середины сна и потребности во сне (фильтры Калмана).
+- Двухпроцессная модель бодрости (Борбели), дневной сон перед событием.
+- Точный план по ночам динамическим программированием, сверенный с полным перебором.
+- Перетаскивание сегодняшнего отбоя с живым сравнением последствий.
+- Конфликты с проверенными выходами, What if, «почему этот отбой».
+- Stats: 7 секций, срез по периоду и по ночи.
 
 ## Стек
 
 - Expo SDK 54 + expo-router, TypeScript
-- `expo-sqlite` — вся persistence локально на устройстве, интернет не нужен
-- `expo-notifications` / `expo-haptics` — если приложение их использует
+- `expo-sqlite` — всё локально, интернет не нужен
+- `expo-haptics`, `react-native-reanimated`, `react-native-gesture-handler`, `react-native-svg`
 
 ## Запуск
 
@@ -21,23 +30,18 @@ npm install
 npx expo start
 ```
 
-`a` — Android, `i` — iOS, либо QR-код через Expo Go.
+## Проверки
+
+```bash
+npm run verify   # tsc + node --test + check-rules + expo export
+```
 
 ## Структура проекта
 
 ```
-app/            expo-router экраны
-src/
-  theme/        палитра, типографика, отступы, анимации
-  db/           expo-sqlite схема + миграции
-  data/         доступ к данным (замени items.example.ts)
-  services/     notifications, haptics
-  components/   переиспользуемые UI-примитивы
-  lib/          id, даты
-tools/          генератор иконок, проверки, rename-скрипт
+app/            экраны: index, plan, whatif, event/[id], stats, settings
+src/lib/        движок: clock, phase, alertness, runway, changes, conflicts, explain, history
+src/data/       repo.ts — доступ к SQLite (через мьютекс)
+src/store/      appStore.ts — журнал → оценка часов → план
+src/components/ PhaseDial, SleepBand, AlertnessCurve, RunwayStrip, NightBars, PhaseTrend, LogSheet, AnchorSheet + шаблонные
 ```
-
-## Данные
-
-Все данные хранятся локально на устройстве. Регистрации нет, интернет не
-требуется для работы приложения.

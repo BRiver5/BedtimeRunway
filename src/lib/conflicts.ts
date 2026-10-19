@@ -5,7 +5,8 @@
 import { buildRunway, goalDelta, nightsNeeded, ALERT_TARGET, type Plan, type RunwayInput } from "./runway.ts";
 import { applyChange, describeChange, type Change } from "./changes.ts";
 import { addDays, daysBetween, dayLabel, weekdayLabel } from "./time.ts";
-import { fmtClock, fmtDuration } from "./clock.ts";
+import { eventInNightFrame, fmtClock, fmtDuration } from "./clock.ts";
+import { napTimeFor } from "./alertness.ts";
 
 export type Fix = { changes: Change[]; label: string; gain: number; effect: string };
 
@@ -81,9 +82,10 @@ export function findConflicts(input: RunwayInput, plan: Plan): Conflict[] {
       if (r.score >= ALERT_TARGET) continue;
       const a = input.anchors.find((x) => x.id === r.id)!;
       const cands: Change[][] = [];
-      if (!a.nap) cands.push([{ kind: "nap", anchorId: a.id, on: true }]);
+      const napOk = napTimeFor(eventInNightFrame(a.time)) > n.actualWake + 60;
+      if (!a.nap && napOk) cands.push([{ kind: "nap", anchorId: a.id, on: true }]);
       cands.push([{ kind: "pace", minutes: input.pace + 15 }]);
-      if (!a.nap) cands.push([{ kind: "nap", anchorId: a.id, on: true }, { kind: "pace", minutes: input.pace + 15 }]);
+      if (!a.nap && napOk) cands.push([{ kind: "nap", anchorId: a.id, on: true }, { kind: "pace", minutes: input.pace + 15 }]);
       out.push({
         id: `anchor-${a.id}`,
         kind: "lowAnchor",

@@ -10,7 +10,7 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 // Hero: сутки по кругу (полночь сверху). Внутреннее кольцо — сегодняшнее окно
 // сна по плану (рисуется), внешнее пунктирное — окно сна цели, точка —
 // где сейчас середина сна по внутренним часам. Метка на кольце едет к фазе.
-function Arc({ size, r, stroke, color, from, len, delay, dashed }: { size: number; r: number; stroke: number; color: string; from: number; len: number; delay: number; dashed?: boolean }) {
+function Arc({ size, r, stroke, color, from, len, delay }: { size: number; r: number; stroke: number; color: string; from: number; len: number; delay: number }) {
   const C = 2 * Math.PI * r;
   const L = (Math.max(0, len) / 1440) * C;
   const p = useSharedValue(0);
@@ -18,14 +18,10 @@ function Arc({ size, r, stroke, color, from, len, delay, dashed }: { size: numbe
     p.value = 0;
     p.value = withDelay(delay, withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) }));
   }, [from, len, delay]);
-  const props = useAnimatedProps(() => ({ strokeDasharray: dashed ? `4 6` : `${L * p.value} ${C}`, strokeOpacity: dashed ? p.value : 1 }));
+  const props = useAnimatedProps(() => ({ strokeDasharray: `${L * p.value} ${C}`, strokeOpacity: p.value > 0.002 ? 1 : 0 }));
   return (
     <G rotation={(toClock(from) / 1440) * 360 - 90} originX={size / 2} originY={size / 2}>
-      {dashed ? (
-        <AnimatedCircle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="butt" animatedProps={props} strokeDashoffset={0} />
-      ) : (
-        <AnimatedCircle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round" animatedProps={props} />
-      )}
+      <AnimatedCircle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round" animatedProps={props} />
     </G>
   );
 }
@@ -53,8 +49,8 @@ export function PhaseDial({
 }) {
   const t = useTheme();
   const c = size / 2;
-  const rIn = size / 2 - 34;
-  const rOut = size / 2 - 14;
+  const rOut = size / 2 - 26; // окно сна цели
+  const rIn = rOut - 16; // окно сна сегодня
   const angle = useSharedValue(0);
   useEffect(() => {
     angle.value = withTiming((toClock(phase) / 1440) * 360, { duration: 900, easing: Easing.out(Easing.cubic) });
@@ -68,11 +64,11 @@ export function PhaseDial({
         <Circle cx={c} cy={c} r={rIn} stroke={t.colors.backgroundAlt} strokeWidth={16} fill="none" />
         {ticks.map((h) => {
           const a = ((h / 24) * 360 - 90) * (Math.PI / 180);
-          const r1 = rIn - 14;
-          const r2 = rIn - (h % 6 === 0 ? 22 : 17);
+          const r1 = rIn - 13;
+          const r2 = rIn - (h % 6 === 0 ? 19 : 16);
           return <Line key={h} x1={c + r1 * Math.cos(a)} y1={c + r1 * Math.sin(a)} x2={c + r2 * Math.cos(a)} y2={c + r2 * Math.sin(a)} stroke={h % 6 === 0 ? t.colors.inkMuted : t.colors.border} strokeWidth={h % 6 === 0 ? 2 : 1} />;
         })}
-        {goalBed !== null && goalWake !== null ? <Arc size={size} r={rOut} stroke={4} color={t.colors.dawn} from={goalBed} len={goalWake - goalBed} delay={300} dashed /> : null}
+        {goalBed !== null && goalWake !== null ? <Arc size={size} r={rOut} stroke={5} color={t.colors.dawn} from={goalBed} len={goalWake - goalBed} delay={300} /> : null}
         <Arc size={size} r={rIn} stroke={16} color={t.colors.accent} from={bed} len={wake - bed} delay={0} />
       </Svg>
       <Animated.View pointerEvents="none" style={[{ position: "absolute", width: size, height: size, alignItems: "center" }, marker]}>
@@ -80,10 +76,10 @@ export function PhaseDial({
       </Animated.View>
       {(["12 am", "6 am", "12 pm", "6 pm"] as const).map((l, i) => {
         const pos = [
-          { top: 4, left: c - 20 },
-          { top: c - 8, right: -2 },
-          { bottom: 2, left: c - 20 },
-          { top: c - 8, left: -2 },
+          { top: 0, left: c - 20 },
+          { top: c - 7, right: -10 },
+          { bottom: 0, left: c - 20 },
+          { top: c - 7, left: -10 },
         ][i];
         return (
           <Text key={l} style={{ position: "absolute", width: 40, textAlign: "center", fontSize: 10, fontWeight: "700", color: t.colors.inkFaint, ...pos }}>
@@ -93,7 +89,7 @@ export function PhaseDial({
       })}
       <View style={{ alignItems: "center" }}>
         <Text style={{ ...t.typography.overline, color: t.colors.inkMuted }}>{title}</Text>
-        <Text style={{ fontSize: 34, fontWeight: "800", color: t.colors.ink, letterSpacing: -0.5 }}>{big}</Text>
+        <Text style={{ fontSize: 28, fontWeight: "800", color: t.colors.ink, letterSpacing: -0.5 }}>{big}</Text>
         <Text style={{ ...t.typography.caption, color: t.colors.inkMuted }}>{sub}</Text>
       </View>
     </View>

@@ -78,9 +78,10 @@ export default function Home() {
             phase={input.phase}
             goalBed={goalBed}
             goalWake={goalWake}
-            title="Lights out tonight"
+            title="Tonight"
+            size={272}
             big={fmtNoon(tonight.bed)}
-            sub={`up ${fmtNoon(tonight.actualWake)} · ${fmtDuration(tonight.sleep)}`}
+            sub={`up ${fmtNoon(tonight.actualWake)}`}
           />
         </Animated.View>
 

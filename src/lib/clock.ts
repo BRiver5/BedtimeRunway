@@ -18,8 +18,9 @@ export function eventInNightFrame(clock: number): number {
   return clock + 720;
 }
 
+// Показываем с точностью до 5 минут: план считается в минутах, но "11:21 pm" выглядит как ошибка.
 export function fmtClock(clock: number): string {
-  const m = ((Math.round(clock) % DAY) + DAY) % DAY;
+  const m = ((Math.round(clock / 5) * 5 % DAY) + DAY) % DAY;
   const h = Math.floor(m / 60);
   const mm = m % 60;
   const h12 = h % 12 === 0 ? 12 : h % 12;

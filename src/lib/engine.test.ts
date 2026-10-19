@@ -136,6 +136,16 @@ test("what-if with a forced late bedtime tonight costs sleep", () => {
   assert.equal(why.reason, "You set tonight's bedtime yourself.");
 });
 
+test("a forced early bedtime can't jump the body clock: you lie awake", () => {
+  const inp = input({ alarm: { clock: 7 * 60, days: EVERY } });
+  const base = buildRunway(inp);
+  const early = buildRunway({ ...inp, tonightBed: base.nights[0].bed - 135 });
+  const n0 = early.nights[0];
+  assert.ok(n0.shift >= -inp.pace, "clock moves no faster than the pace");
+  assert.ok(n0.awakeInBed >= 90, `awake ${n0.awakeInBed}`);
+  assert.ok(early.cost > base.cost);
+});
+
 test("history: social jet lag, trajectory and Wilson buckets", () => {
   const logs = [
     { night: "2026-10-10", bed: fromClock(60), wake: fromClock(600), alarm: false, quality: 5 },

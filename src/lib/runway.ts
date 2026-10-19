@@ -18,6 +18,10 @@ const W_LOSS = 10; // за (час недосыпа)²
 const W_SHIFT = 0.012; // за минуту сдвига
 const W_TERMINAL = 6; // за (час до фазы цели)²
 const W_ANCHOR = 1; // × важность × (дефицит/10)²
+const W_AWAKE = 4; // за (час без сна в постели)²
+// Насколько раньше "естественного" отбоя ещё можно заснуть. Отбой, заданный
+// руками, не двигает часы быстрее темпа: лёг раньше — лежишь без сна.
+export const EARLY_SLEEP = 30;
 
 export type Anchor = { id: string; name: string; date: string; time: number; importance: number; nap: boolean };
 export type Rule = { clock: number; days: number } | null; // days — маска утр, бит 0 = Mon
@@ -49,7 +53,9 @@ export type Night = {
   delta: number; // сдвиг фазы после ночи от текущей
   shift: number; // сдвиг этой ночи
   anchors: AnchorResult[];
-  cost: { loss: number; shift: number; anchors: number };
+  onset: number; // когда реально уснёшь
+  awakeInBed: number; // минут без сна после отбоя
+  cost: { loss: number; shift: number; anchors: number; awake: number };
 };
 
 export type Plan = {
@@ -86,13 +92,19 @@ export function horizon(input: RunwayInput): number {
 
 type NightEval = { night: Night; cost: number };
 
-function evalNight(input: RunwayInput, night: string, from: number, to: number): NightEval {
+function evalNight(input: RunwayInput, night: string, from: number, to: number, forcedBed: number | null = null): NightEval {
   const mid = input.phase + to;
-  const bed = mid - input.need / 2;
-  const wake = mid + input.need / 2;
+  const natural = mid - input.need / 2;
   const wakeBy = wakeRuleFor(input, night);
+  const wake = mid + input.need / 2;
+  // Если утро обрежет будильник — лечь раньше "естественного" отбоя, насколько
+  // ещё получается заснуть (до EARLY_SLEEP), чтобы смягчить недосып.
+  const early = forcedBed === null && wakeBy !== null && wake > wakeBy ? Math.min(EARLY_SLEEP, wake - wakeBy) : 0;
+  const bed = forcedBed ?? natural - early;
+  const onset = forcedBed === null ? bed : Math.max(forcedBed, natural - EARLY_SLEEP);
+  const awakeInBed = onset - bed;
   const actualWake = wakeBy !== null ? Math.min(wake, wakeBy) : wake;
-  const sleep = Math.max(0, actualWake - bed);
+  const sleep = Math.max(0, actualWake - onset);
   const loss = Math.max(0, input.need - sleep);
   const morning = addDays(night, 1);
   const anchors: AnchorResult[] = [];
@@ -106,8 +118,8 @@ function evalNight(input: RunwayInput, night: string, from: number, to: number):
     anchorCost += W_ANCHOR * a.importance * (deficit / 10) ** 2;
   }
   const shift = to - from;
-  const c = { loss: W_LOSS * (loss / 60) ** 2, shift: W_SHIFT * Math.abs(shift), anchors: anchorCost };
-  return { night: { night, bed, wake, wakeBy, actualWake, sleep, loss, mid, delta: to, shift, anchors, cost: c }, cost: c.loss + c.shift + c.anchors };
+  const c = { loss: W_LOSS * (loss / 60) ** 2, shift: W_SHIFT * Math.abs(shift), anchors: anchorCost, awake: W_AWAKE * (awakeInBed / 60) ** 2 };
+  return { night: { night, bed, wake, wakeBy, actualWake, sleep, loss, mid, delta: to, shift, onset, awakeInBed, anchors, cost: c }, cost: c.loss + c.shift + c.anchors + c.awake };
 }
 
 export function goalDelta(input: RunwayInput): number | null {
@@ -135,16 +147,13 @@ export function buildRunway(input: RunwayInput): Plan {
       let best = Infinity;
       let arg = i;
       const from = val(i);
-      let jLo = Math.max(0, idx(from + lo));
-      let jHi = Math.min(S - 1, idx(from + hi));
-      if (n === 0 && input.tonightBed !== null && input.tonightBed !== undefined) {
-        // Сегодняшний отбой задан жестом: фаза ночи выводится из него.
-        const forced = Math.max(0, Math.min(S - 1, idx(snap(input.tonightBed + input.need / 2 - input.phase))));
-        jLo = forced;
-        jHi = forced;
-      }
+      const jLo = Math.max(0, idx(from + lo));
+      const jHi = Math.min(S - 1, idx(from + hi));
+      // Сегодняшний отбой задан жестом: сдвиг часов ДП по-прежнему выбирает в
+      // пределах темпа, а сон считается от реального засыпания.
+      const forced = n === 0 && input.tonightBed !== null && input.tonightBed !== undefined ? input.tonightBed : null;
       for (let j = jLo; j <= jHi; j++) {
-        const c = evalNight(input, nights[n], from, val(j)).cost + cost[n + 1][j];
+        const c = evalNight(input, nights[n], from, val(j), forced).cost + cost[n + 1][j];
         if (c < best) {
           best = c;
           arg = j;
@@ -159,7 +168,7 @@ export function buildRunway(input: RunwayInput): Plan {
   let i = idx(0);
   for (let n = 0; n < N; n++) {
     const j = choice[n][i];
-    out.push(evalNight(input, nights[n], val(i), val(j)).night);
+    out.push(evalNight(input, nights[n], val(i), val(j), n === 0 ? (input.tonightBed ?? null) : null).night);
     i = j;
   }
   const finalDelta = out.length ? out[out.length - 1].delta : 0;
@@ -186,7 +195,7 @@ export function scoreSequence(input: RunwayInput, deltas: number[]): number {
   let total = 0;
   for (let n = 0; n < N; n++) {
     const to = deltas[n];
-    total += evalNight(input, addDays(input.tonight, n), from, to).cost;
+    total += evalNight(input, addDays(input.tonight, n), from, to, n === 0 ? (input.tonightBed ?? null) : null).cost;
     from = to;
   }
   if (gd !== null) total += W_TERMINAL * ((from - Math.max(-RANGE, Math.min(RANGE, gd))) / 60) ** 2;

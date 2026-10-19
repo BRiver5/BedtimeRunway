@@ -83,7 +83,7 @@ export default function PlanScreen() {
           <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
             <Text style={{ fontSize: 28, fontWeight: "800", color: t.colors.ink }}>{fmtNoon(shown.bed)}</Text>
             <Text style={{ ...t.typography.caption, color: t.colors.inkMuted }}>
-              up {fmtNoon(shown.actualWake)} · {fmtDuration(shown.sleep)}
+              up {fmtNoon(shown.actualWake)} · {fmtDuration(shown.sleep)} asleep
             </Text>
           </View>
           <SleepBand
@@ -105,6 +105,11 @@ export default function PlanScreen() {
               <Text style={{ ...t.typography.label, color: t.colors.ink }}>
                 {fmtShift(preview.after.nights[0].bed - tonight.bed)} than planned
               </Text>
+              {preview.after.nights[0].awakeInBed >= 10 ? (
+                <Text style={{ ...t.typography.caption, color: t.colors.signal }}>
+                  Your body clock won't be ready: expect to lie awake about {fmtDuration(preview.after.nights[0].awakeInBed)} (asleep ≈ {fmtNoon(preview.after.nights[0].onset)}).
+                </Text>
+              ) : null}
               <Text style={{ ...t.typography.caption, color: preview.lossDelta > 5 ? t.colors.danger : t.colors.inkMuted }}>
                 Lost sleep this week: {fmtDuration(preview.before.totalLoss)} → {fmtDuration(preview.after.totalLoss)}
               </Text>
@@ -133,9 +138,10 @@ export default function PlanScreen() {
             <Row k="Body clock now" v={`mid-sleep ${fmtNoon(why.phase)} ± ${Math.round(why.phaseSd)} min`} />
             {why.goalPhase !== null ? <Row k="Goal needs" v={`mid-sleep ${fmtNoon(why.goalPhase)}`} /> : null}
             <Row k="Tonight moves it" v={fmtShift(why.night.shift)} />
-            {why.gap !== null ? <Row k="Still to go after tonight" v={Math.abs(why.gap) < 5 ? "nothing" : fmtDuration(why.gap)} /> : null}
+            {why.gap !== null ? <Row k="Still to go after tonight" v={Math.abs(why.gap) < 5 ? "nothing" : fmtShift(why.gap)} /> : null}
             {why.nightsLeft !== null ? <Row k="Nights before the goal starts" v={String(why.nightsLeft)} /> : null}
             <Row k="Your pace" v={`up to ${fmtDuration(input.pace)} earlier, ${fmtDuration(input.maxDelay)} later a night`} />
+            {why.early >= 5 ? <Row k="Lights out early" v={`${fmtDuration(why.early)} before your clock — you can still fall asleep`} /> : null}
             {why.truncated ? <Text style={{ ...t.typography.caption, color: t.colors.signal }}>Tomorrow's fixed wake time ({fmtNoon(why.night.wakeBy!)}) cuts {fmtDuration(why.night.loss)} off the night.</Text> : null}
           </Animated.View>
         ) : null}

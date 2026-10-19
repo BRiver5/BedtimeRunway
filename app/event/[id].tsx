@@ -12,7 +12,7 @@ import { AnimatedCounter } from "../../src/components/AnimatedCounter";
 import { Chip, IconButton, SectionTitle, Stepper } from "../../src/components/Bits";
 import { Toggle } from "../../src/components/Toggle";
 import { IMPORTANCE } from "../../src/components/AnchorSheet";
-import { curve } from "../../src/lib/alertness";
+import { curve, napTimeFor } from "../../src/lib/alertness";
 import { explainAnchor } from "../../src/lib/explain";
 import { ALERT_TARGET } from "../../src/lib/runway";
 import { fmtClock, fmtDuration, fmtNoon } from "../../src/lib/clock";
@@ -31,7 +31,9 @@ export default function EventDetail() {
   if (!a) return null;
 
   const save = (patch: Partial<typeof a>) => app.saveAnchor({ ...a, ...patch });
-  const pts = ex ? curve(ex.night.actualWake, ex.night.sleep, ex.night.mid, 20, ex.napAt) : [];
+  // Точное время события — отдельной точкой, чтобы подпись не съезжала на ближайший шаг кривой.
+  const pts = ex ? [...curve(ex.night.actualWake, ex.night.sleep, ex.night.mid, 20, ex.napAt), { t: ex.t, score: ex.parts.score }].sort((p, q) => p.t - q.t) : [];
+  const napPossible = ex ? napTimeFor(ex.t) > ex.night.actualWake + 60 : true;
   const score = ex?.parts.score ?? 0;
 
   return (
@@ -112,15 +114,17 @@ export default function EventDetail() {
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <View style={{ flex: 1 }}>
               <Text style={{ ...t.typography.label, color: t.colors.ink }}>20-min nap 3 hours before</Text>
-              <Text style={{ ...t.typography.caption, color: t.colors.inkMuted }}>{ex ? `${ex.napGain >= 0 ? "+" : ""}${Math.round(ex.napGain)} alertness at the event` : "Planned with the event"}</Text>
+              <Text style={{ ...t.typography.caption, color: t.colors.inkMuted }}>{!napPossible ? "Too early in the day — you'd barely be up by then." : ex ? `${ex.napGain >= 0 ? "+" : ""}${Math.round(ex.napGain)} alertness at the event` : "Planned with the event"}</Text>
             </View>
-            <Toggle
-              value={a.nap}
-              onValueChange={(v) => {
-                haptics.tick();
-                save({ nap: v });
-              }}
-            />
+            {napPossible || a.nap ? (
+              <Toggle
+                value={a.nap}
+                onValueChange={(v) => {
+                  haptics.tick();
+                  save({ nap: v });
+                }}
+              />
+            ) : null}
           </View>
         </View>
 

@@ -17,6 +17,7 @@ export type TonightWhy = {
   cappedByPace: boolean;
   reason: string; // главный мотив сдвига
   truncated: boolean; // утром обрежет будильник
+  early: number; // минут раньше "естественного" отбоя, чтобы смягчить будильник
 };
 
 export function explainTonight(input: RunwayInput, plan: Plan, phaseSd: number): TonightWhy | null {
@@ -32,7 +33,8 @@ export function explainTonight(input: RunwayInput, plan: Plan, phaseSd: number):
   else if (cappedByPace) reason = "Moving as fast as your pace allows.";
   else if (night.anchors.length) reason = "Balanced against how alert you need to be tomorrow.";
   else reason = "A partial step: a bigger jump would cost more sleep than it saves later.";
-  return { night, phase: input.phase, phaseSd, goalPhase, gap, nightsLeft, cappedByPace, reason, truncated: night.wakeBy !== null && night.wakeBy < night.wake };
+  const early = input.tonightBed === null || input.tonightBed === undefined ? Math.max(0, night.mid - input.need / 2 - night.bed) : 0;
+  return { night, phase: input.phase, phaseSd, goalPhase, gap, nightsLeft, cappedByPace, reason, truncated: night.wakeBy !== null && night.wakeBy < night.wake, early };
 }
 
 export function explainAnchor(input: RunwayInput, plan: Plan, anchorId: string) {

@@ -63,7 +63,7 @@ export default function Stats() {
   const goalMid = app.settings.goal ? fromClock(app.settings.goal.clock) - need / 2 : null;
 
   // Тепловая карта качества: 8 недель × 7 дней, колонки — недели.
-  const weeks = Math.max(2, Math.ceil(days / 7));
+  const weeks = Math.ceil(days / 7) + 1; // + текущая неделя, она ещё впереди
   const first = weekStart(addDays(app.tonight, -(weeks - 1) * 7));
   const qmap = new Map(app.logs.map((l) => [l.night, l.quality]));
   const cells = Array.from({ length: 7 * weeks }, (_, i) => {
