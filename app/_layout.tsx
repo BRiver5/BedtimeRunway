@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { AppState, View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
@@ -8,23 +8,33 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { getDb } from "../src/db/client";
 import { useTheme } from "../src/theme";
 import { useUi } from "../src/store/uiStore";
+import { currentNight, useApp } from "../src/store/appStore";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
   const theme = useTheme();
+  const storeReady = useApp((s) => s.ready);
 
   useEffect(() => {
     getDb()
+      .then(() => useApp.getState().refresh())
       .then(() => setReady(true))
       .finally(() => SplashScreen.hideAsync().catch(() => {}));
+    // Открыли на следующий день — перепланировать с новой "сегодняшней ночью".
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active" && useApp.getState().ready && useApp.getState().tonight !== currentNight()) useApp.getState().refresh();
+    });
+    return () => sub.remove();
   }, []);
 
-  // Если в приложении есть zustand-стор с данными: после горячей перезагрузки
-  // модуля он пустой — здесь проверить store.ready и вызвать refresh() ещё раз,
-  // иначе экраны получат null (проверено на Churnly).
-  if (!ready) return null;
+  // После горячей перезагрузки модуля стор пустой — пересобрать.
+  useEffect(() => {
+    if (ready && !storeReady) useApp.getState().refresh();
+  }, [ready, storeReady]);
+
+  if (!ready || !storeReady) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
